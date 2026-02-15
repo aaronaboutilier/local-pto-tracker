@@ -1,6 +1,6 @@
 # Local PTO Tracker
 
-A local-first PTO (Paid Time Off) tracker built with Vue 3 and Vite. This application helps you manage and track your vacation, VPP (Voluntary Protection Program), sick days, and personal time off with fiscal year accounting.
+A local-first PTO (Paid Time Off) tracker built with Vue 3 and Vite. This application helps you manage and track your vacation, VPP (Vacation Purchase Program), sick days, and personal time off with fiscal year accounting.
 
 ## Features
 
@@ -11,7 +11,6 @@ A local-first PTO (Paid Time Off) tracker built with Vue 3 and Vite. This applic
   - Regular Vacation
   - Sick Days
   - Personal Days
-- **Flexible Display**: Toggle between hours and days view
 - **Calendar Integration**: Built with FullCalendar for month, week, day, and year views
 - **Event Management**: Create, edit, and delete PTO events with custom metadata
 - **Progress Tracking**: Visual progress bars show usage and remaining balance for each PTO bucket
