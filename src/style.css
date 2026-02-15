@@ -128,6 +128,51 @@ body {
   margin-bottom: 6px;
 }
 
+.pto-bucket-inputs {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pto-bucket-color {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  border: 1px solid var(--border-main);
+  display: inline-block;
+}
+
+.bucket-remove-btn,
+.bucket-add-btn {
+  border: 1px solid var(--border-main);
+  border-radius: 6px;
+  padding: 6px 10px;
+  background: var(--bg-surface);
+  color: var(--text-strong);
+  cursor: pointer;
+}
+
+.bucket-remove-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.bucket-add-btn:hover,
+.bucket-remove-btn:hover:enabled {
+  background: var(--bg-subtle);
+}
+
+.pto-bucket-add {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 6px;
+  align-items: center;
+}
+
+.pto-color-input {
+  padding: 2px;
+}
+
 .pto-setting--checkbox {
   display: flex;
   align-items: center;

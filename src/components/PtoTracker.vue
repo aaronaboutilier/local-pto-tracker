@@ -28,6 +28,8 @@ const emit = defineEmits([
   'update-bucket-size',
   'update-hours-per-day',
   'update-show-holiday-tracker',
+  'add-bucket',
+  'remove-bucket',
   'clear-events',
 ])
 
@@ -48,12 +50,7 @@ const monthOptions = [
   'December',
 ]
 
-const allocationBuckets = computed(() => [
-  { key: 'vpp', label: 'VPP Vacation', color: '#8E44AD' },
-  { key: 'vacation', label: 'Regular Vacation', color: '#2980B9' },
-  { key: 'sick', label: 'Sick Days', color: '#C0392B' },
-  { key: 'personal', label: 'Personal', color: '#27AE60' },
-])
+const allocationBuckets = computed(() => props.settings.buckets || [])
 
 const trackerBuckets = computed(() => {
   const baseBuckets = [...allocationBuckets.value]
@@ -223,6 +220,51 @@ function onShowHolidayToggle(event) {
   emit('update-show-holiday-tracker', event.target.checked)
 }
 
+const newBucketName = ref('')
+const newBucketColor = ref('#1a73e8')
+
+function toBucketKey(label) {
+  const normalized = label.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-+|-+$)/g, '') || 'bucket'
+  const existingKeys = allocationBuckets.value.map((bucket) => bucket.key)
+
+  if (!existingKeys.includes(normalized)) {
+    return normalized
+  }
+
+  let counter = 2
+  let candidate = `${normalized}-${counter}`
+  while (existingKeys.includes(candidate)) {
+    counter += 1
+    candidate = `${normalized}-${counter}`
+  }
+
+  return candidate
+}
+
+function onAddBucket() {
+  const label = newBucketName.value.trim()
+  if (!label) {
+    return
+  }
+
+  const key = toBucketKey(label)
+  emit('add-bucket', {
+    key,
+    label,
+    color: newBucketColor.value || '#1a73e8',
+  })
+
+  newBucketName.value = ''
+}
+
+function onRemoveBucket(bucketKey) {
+  if (allocationBuckets.value.length <= 1) {
+    return
+  }
+
+  emit('remove-bucket', bucketKey)
+}
+
 function toggleSettings() {
   settingsOpen.value = !settingsOpen.value
 }
@@ -351,16 +393,43 @@ function closeSettings() {
             :key="`allocation-${bucket.key}`"
             class="pto-setting pto-setting--bucket"
           >
-            <label class="pto-setting__label" :for="`allocation-${bucket.key}`">{{ bucket.label }}</label>
-            <input
-              :id="`allocation-${bucket.key}`"
-              class="pto-setting__control"
-              type="number"
-              min="0"
-              :step="viewMode === 'hours' ? 0.5 : 0.25"
-              :value="getBucketInputValue(bucket.key)"
-              @change="onBucketSizeChange(bucket.key, $event)"
-            />
+            <div class="pto-bucket-row__top">
+              <label class="pto-setting__label" :for="`allocation-${bucket.key}`">{{ bucket.label }}</label>
+              <button
+                class="bucket-remove-btn"
+                :disabled="allocationBuckets.length <= 1"
+                @click="onRemoveBucket(bucket.key)"
+              >
+                Remove
+              </button>
+            </div>
+            <div class="pto-bucket-inputs">
+              <input
+                :id="`allocation-${bucket.key}`"
+                class="pto-setting__control"
+                type="number"
+                min="0"
+                :step="viewMode === 'hours' ? 0.5 : 0.25"
+                :value="getBucketInputValue(bucket.key)"
+                @change="onBucketSizeChange(bucket.key, $event)"
+              />
+              <span class="pto-bucket-color" :style="{ backgroundColor: bucket.color }" aria-hidden="true"></span>
+            </div>
+          </div>
+
+          <div class="pto-setting pto-setting--bucket">
+            <label class="pto-setting__label" for="new-bucket-name">Add bucket</label>
+            <div class="pto-bucket-add">
+              <input
+                id="new-bucket-name"
+                v-model="newBucketName"
+                class="pto-setting__control"
+                type="text"
+                placeholder="Name"
+              />
+              <input v-model="newBucketColor" class="pto-setting__control pto-color-input" type="color" />
+              <button class="bucket-add-btn" @click="onAddBucket">Add</button>
+            </div>
           </div>
         </div>
 

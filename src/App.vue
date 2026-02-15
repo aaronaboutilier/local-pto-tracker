@@ -38,12 +38,15 @@ const {
   updateHoursPerDay,
   updateShowHolidayInTracker,
   updateThemeMode,
+  addBucket,
+  removeBucket,
   ptoColors,
 } = usePtoStore()
 
 let systemThemeMedia = null
 
 const isYearView = computed(() => activeView.value === 'year')
+const defaultBucketType = computed(() => state.settings.buckets[0]?.key || 'vacation')
 const calendarEvents = computed(() =>
   state.events.map((eventItem) => ({
     ...eventItem,
@@ -232,7 +235,7 @@ function openCreateModal(startDate = new Date(), allDay = true) {
     start: toLocalInputValue(startDate),
     allDay,
     extendedProps: {
-      type: 'vacation',
+      type: defaultBucketType.value,
       hours: allDay ? state.settings.hoursPerDay : 1,
     },
   }
@@ -241,13 +244,18 @@ function openCreateModal(startDate = new Date(), allDay = true) {
 
 function openEditModal(eventItem) {
   modalMode.value = 'edit'
+  const type = eventItem.extendedProps?.type
+  const validType =
+    type === 'holiday' || state.settings.buckets.some((bucket) => bucket.key === type)
+      ? type
+      : defaultBucketType.value
   modalInitialEvent.value = {
     id: eventItem.id,
     title: eventItem.title,
     start: toLocalInputValue(eventItem.start || new Date()),
     allDay: eventItem.allDay,
     extendedProps: {
-      type: eventItem.extendedProps?.type || 'vacation',
+      type: validType,
       hours: Number(eventItem.extendedProps?.hours || state.settings.hoursPerDay),
     },
   }
@@ -276,7 +284,11 @@ function closeModal() {
 }
 
 function onSaveEvent(eventForm) {
-  const eventType = eventForm.extendedProps?.type || 'vacation'
+  const rawEventType = eventForm.extendedProps?.type || defaultBucketType.value
+  const eventType =
+    rawEventType === 'holiday' || state.settings.buckets.some((bucket) => bucket.key === rawEventType)
+      ? rawEventType
+      : defaultBucketType.value
   const durationHours = Number(eventForm.extendedProps?.hours || state.settings.hoursPerDay)
   const normalizedStart = eventForm.allDay ? toDateOnly(eventForm.start) : eventForm.start
   const normalizedEnd = eventForm.allDay
@@ -288,7 +300,7 @@ function onSaveEvent(eventForm) {
     id: eventForm.id || String(Date.now()),
     start: normalizedStart,
     end: normalizedEnd,
-    color: ptoColors[eventType] || '#1a73e8',
+    color: ptoColors.value[eventType] || '#1a73e8',
     extendedProps: {
       ...eventForm.extendedProps,
       type: eventType,
@@ -318,6 +330,14 @@ function onUpdateHoursPerDay(hours) {
 
 function onUpdateShowHolidayTracker(value) {
   updateShowHolidayInTracker(value)
+}
+
+function onAddBucket(bucketDefinition) {
+  addBucket(bucketDefinition)
+}
+
+function onRemoveBucket(bucketKey) {
+  removeBucket(bucketKey)
 }
 
 function onClearEvents() {
@@ -399,6 +419,8 @@ changeView('month')
         @update-bucket-size="onUpdateBucketSize"
         @update-hours-per-day="onUpdateHoursPerDay"
         @update-show-holiday-tracker="onUpdateShowHolidayTracker"
+        @add-bucket="onAddBucket"
+        @remove-bucket="onRemoveBucket"
         @clear-events="onClearEvents"
       />
 
@@ -437,6 +459,7 @@ changeView('month')
       :mode="modalMode"
       :initial-event="modalInitialEvent"
       :hours-per-day="state.settings.hoursPerDay"
+      :bucket-options="state.settings.buckets"
       @close="closeModal"
       @save="onSaveEvent"
       @delete="onDeleteEvent"

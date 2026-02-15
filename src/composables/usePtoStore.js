@@ -10,9 +10,6 @@ const DEFAULT_BALANCES = {
   sick: 75,
   personal: 15,
 }
-const BUCKET_KEYS = ['vpp', 'vacation', 'sick', 'personal']
-const EVENT_TYPES = ['vpp', 'vacation', 'sick', 'personal', 'holiday']
-
 const PTO_COLORS = {
   vacation: '#2980B9',
   vpp: '#8E44AD',
@@ -20,6 +17,12 @@ const PTO_COLORS = {
   personal: '#27AE60',
   holiday: '#F9AB00',
 }
+const DEFAULT_BUCKETS = [
+  { key: 'vpp', label: 'VPP Vacation', color: PTO_COLORS.vpp },
+  { key: 'vacation', label: 'Regular Vacation', color: PTO_COLORS.vacation },
+  { key: 'sick', label: 'Sick Days', color: PTO_COLORS.sick },
+  { key: 'personal', label: 'Personal', color: PTO_COLORS.personal },
+]
 
 function toLocalDateTimeString(date) {
   const year = date.getFullYear()
@@ -71,6 +74,7 @@ const state = reactive({
     showHolidayInTracker: true,
     themeMode: 'system',
     bucketSizes: { ...DEFAULT_BALANCES },
+    buckets: [...DEFAULT_BUCKETS],
   },
   yearlyBalances: {},
   events: mockEvents.map(normalizeEvent),
@@ -79,8 +83,70 @@ const state = reactive({
 let hasInitialized = false
 let hasStartedAutoSave = false
 
+function normalizeBucketDefinitions(buckets) {
+  if (!Array.isArray(buckets) || buckets.length === 0) {
+    return [...DEFAULT_BUCKETS]
+  }
+
+  const seen = new Set()
+
+  return buckets.reduce((accumulator, bucket) => {
+    const key = bucket?.key
+    if (!key || seen.has(key)) {
+      return accumulator
+    }
+
+    seen.add(key)
+    accumulator.push({
+      key,
+      label: bucket.label || key,
+      color: bucket.color || PTO_COLORS[key] || '#1a73e8',
+    })
+
+    return accumulator
+  }, [])
+}
+
+function getBucketKeys() {
+  return state.settings.buckets.map((bucket) => bucket.key)
+}
+
+function buildBucketSizesMap(bucketSizes = state.settings.bucketSizes) {
+  const sizes = {}
+
+  getBucketKeys().forEach((bucketKey) => {
+    const value = bucketSizes?.[bucketKey]
+    sizes[bucketKey] =
+      typeof value === 'number' ? value : Number(DEFAULT_BALANCES[bucketKey] || 0)
+  })
+
+  return sizes
+}
+
 function cloneDefaultBalances() {
-  return { ...state.settings.bucketSizes }
+  return buildBucketSizesMap()
+}
+
+function resolveEventType(eventType) {
+  if (eventType === 'holiday') {
+    return 'holiday'
+  }
+
+  const bucketKeys = getBucketKeys()
+  if (eventType && bucketKeys.includes(eventType)) {
+    return eventType
+  }
+
+  return bucketKeys[0] || 'vacation'
+}
+
+function resolveEventColor(eventType) {
+  if (eventType === 'holiday') {
+    return PTO_COLORS.holiday
+  }
+
+  const bucket = state.settings.buckets.find((entry) => entry.key === eventType)
+  return bucket?.color || PTO_COLORS[eventType] || '#1a73e8'
 }
 
 function getFiscalYear(date = new Date()) {
@@ -94,13 +160,9 @@ function ensureBalanceForYear(fiscalYear) {
   const key = String(fiscalYear)
   if (!state.yearlyBalances[key]) {
     state.yearlyBalances[key] = cloneDefaultBalances()
+  } else {
+    state.yearlyBalances[key] = buildBucketSizesMap(state.yearlyBalances[key])
   }
-
-  BUCKET_KEYS.forEach((bucketKey) => {
-    if (typeof state.yearlyBalances[key][bucketKey] !== 'number') {
-      state.yearlyBalances[key][bucketKey] = Number(state.settings.bucketSizes[bucketKey] || 0)
-    }
-  })
 
   return state.yearlyBalances[key]
 }
@@ -124,6 +186,7 @@ function load() {
         state.settings = {
           ...state.settings,
           ...parsed.settings,
+          buckets: normalizeBucketDefinitions(parsed.settings.buckets || state.settings.buckets),
           bucketSizes: {
             ...state.settings.bucketSizes,
             ...(parsed.settings.bucketSizes || {}),
@@ -142,6 +205,11 @@ function load() {
       state.events = mockEvents.map(normalizeEvent)
     }
   }
+
+  state.settings.bucketSizes = buildBucketSizesMap(state.settings.bucketSizes)
+  Object.keys(state.yearlyBalances).forEach((yearKey) => {
+    state.yearlyBalances[yearKey] = buildBucketSizesMap(state.yearlyBalances[yearKey])
+  })
 
   ensureBalanceForYear(getFiscalYear())
   hasInitialized = true
@@ -164,10 +232,13 @@ const activeBalance = computed(() => {
 
 const usageStats = computed(() => {
   const fiscalYear = currentFy.value
-  const totals = EVENT_TYPES.reduce((accumulator, eventType) => {
-    accumulator[eventType] = 0
-    return accumulator
-  }, {})
+  const totals = getBucketKeys().reduce(
+    (accumulator, bucketKey) => {
+      accumulator[bucketKey] = 0
+      return accumulator
+    },
+    { holiday: 0 },
+  )
 
   state.events.forEach((eventItem) => {
     if (!eventItem.start) {
@@ -190,15 +261,52 @@ const usageStats = computed(() => {
 })
 
 function setEvents(events) {
-  state.events = events.map(normalizeEvent)
+  state.events = events.map((eventItem, index) => {
+    const normalizedType = resolveEventType(eventItem.extendedProps?.type)
+    return normalizeEvent(
+      {
+        ...eventItem,
+        color: eventItem.color || resolveEventColor(normalizedType),
+        extendedProps: {
+          ...eventItem.extendedProps,
+          type: normalizedType,
+        },
+      },
+      index,
+    )
+  })
 }
 
 function addEvent(eventItem) {
-  state.events.push(normalizeEvent(eventItem, state.events.length))
+  const normalizedType = resolveEventType(eventItem.extendedProps?.type)
+  state.events.push(
+    normalizeEvent(
+      {
+        ...eventItem,
+        color: eventItem.color || resolveEventColor(normalizedType),
+        extendedProps: {
+          ...eventItem.extendedProps,
+          type: normalizedType,
+        },
+      },
+      state.events.length,
+    ),
+  )
 }
 
 function upsertEvent(eventItem) {
-  const normalized = normalizeEvent(eventItem, state.events.length)
+  const normalizedType = resolveEventType(eventItem.extendedProps?.type)
+  const normalized = normalizeEvent(
+    {
+      ...eventItem,
+      color: eventItem.color || resolveEventColor(normalizedType),
+      extendedProps: {
+        ...eventItem.extendedProps,
+        type: normalizedType,
+      },
+    },
+    state.events.length,
+  )
   const existingIndex = state.events.findIndex((entry) => entry.id === normalized.id)
 
   if (existingIndex >= 0) {
@@ -218,14 +326,24 @@ function clearEvents() {
 }
 
 function updateSettings(nextSettings) {
+  const nextBuckets = nextSettings.buckets
+    ? normalizeBucketDefinitions(nextSettings.buckets)
+    : state.settings.buckets
+
   state.settings = {
     ...state.settings,
     ...nextSettings,
+    buckets: nextBuckets,
     bucketSizes: {
       ...state.settings.bucketSizes,
       ...(nextSettings.bucketSizes || {}),
     },
   }
+
+  state.settings.bucketSizes = buildBucketSizesMap(state.settings.bucketSizes)
+  Object.keys(state.yearlyBalances).forEach((yearKey) => {
+    state.yearlyBalances[yearKey] = buildBucketSizesMap(state.yearlyBalances[yearKey])
+  })
 }
 
 function updateFiscalYearStartMonth(month) {
@@ -239,17 +357,17 @@ function updateFiscalYearStartMonth(month) {
 }
 
 function updateBucketSize(bucket, hours) {
-  if (!BUCKET_KEYS.includes(bucket)) {
+  if (!getBucketKeys().includes(bucket)) {
     return
   }
 
   const parsedHours = Number(hours)
   const normalizedHours = Number.isFinite(parsedHours) ? Math.max(parsedHours, 0) : 0
 
-  state.settings.bucketSizes = {
+  state.settings.bucketSizes = buildBucketSizesMap({
     ...state.settings.bucketSizes,
     [bucket]: normalizedHours,
-  }
+  })
 
   const balance = ensureBalanceForYear(getFiscalYear())
   balance[bucket] = normalizedHours
@@ -269,6 +387,50 @@ function updateThemeMode(mode) {
   const normalizedMode = THEME_MODES.includes(mode) ? mode : 'system'
   state.settings.themeMode = normalizedMode
 }
+
+function addBucket(bucketDefinition) {
+  if (!bucketDefinition?.key) {
+    return
+  }
+
+  const updatedBuckets = normalizeBucketDefinitions([...state.settings.buckets, bucketDefinition])
+  state.settings.buckets = updatedBuckets
+
+  const defaultSize = Number.isFinite(bucketDefinition.hours) ? Math.max(bucketDefinition.hours, 0) : 0
+  state.settings.bucketSizes = buildBucketSizesMap({
+    ...state.settings.bucketSizes,
+    [bucketDefinition.key]: defaultSize,
+  })
+
+  Object.keys(state.yearlyBalances).forEach((yearKey) => {
+    state.yearlyBalances[yearKey] = buildBucketSizesMap(state.yearlyBalances[yearKey])
+  })
+}
+
+function removeBucket(bucketKey) {
+  if (!getBucketKeys().includes(bucketKey)) {
+    return
+  }
+
+  state.settings.buckets = state.settings.buckets.filter((bucket) => bucket.key !== bucketKey)
+
+  const { [bucketKey]: removedSize, ...restSizes } = state.settings.bucketSizes
+  state.settings.bucketSizes = buildBucketSizesMap(restSizes)
+
+  Object.keys(state.yearlyBalances).forEach((yearKey) => {
+    const { [bucketKey]: removedBalance, ...restBalance } = state.yearlyBalances[yearKey] || {}
+    state.yearlyBalances[yearKey] = buildBucketSizesMap(restBalance)
+  })
+}
+
+const ptoColors = computed(() => {
+  const colors = {}
+  state.settings.buckets.forEach((bucket) => {
+    colors[bucket.key] = bucket.color || PTO_COLORS[bucket.key] || '#1a73e8'
+  })
+  colors.holiday = PTO_COLORS.holiday
+  return colors
+})
 
 export function usePtoStore() {
   load()
@@ -291,9 +453,11 @@ export function usePtoStore() {
     updateHoursPerDay,
     updateShowHolidayInTracker,
     updateThemeMode,
+    addBucket,
+    removeBucket,
     save,
     load,
     defaultBalances: DEFAULT_BALANCES,
-    ptoColors: PTO_COLORS,
+    ptoColors,
   }
 }

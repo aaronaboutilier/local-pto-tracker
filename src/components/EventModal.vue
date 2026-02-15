@@ -18,17 +18,21 @@ const props = defineProps({
     type: Number,
     default: 7.5,
   },
+  bucketOptions: {
+    type: Array,
+    default: () => [],
+  },
 })
 
 const emit = defineEmits(['close', 'save', 'delete'])
 
-const typeOptions = [
-  { value: 'vpp', label: 'VPP Vacation' },
-  { value: 'vacation', label: 'Regular Vacation' },
-  { value: 'sick', label: 'Sick' },
-  { value: 'personal', label: 'Personal' },
+const typeOptions = computed(() => [
+  ...props.bucketOptions.map((bucket) => ({
+    value: bucket.key,
+    label: bucket.label || bucket.key,
+  })),
   { value: 'holiday', label: 'Holiday' },
-]
+])
 
 const form = reactive({
   id: '',
@@ -50,7 +54,7 @@ function toLocalInputValue(date) {
 }
 
 function fromEventToForm(eventItem) {
-  const type = eventItem.extendedProps?.type || 'vacation'
+  const type = eventItem.extendedProps?.type || typeOptions.value[0]?.value || 'vacation'
   const hours = Number(
     eventItem.extendedProps?.hours ?? (eventItem.allDay ? props.hoursPerDay : 1),
   )
@@ -59,7 +63,8 @@ function fromEventToForm(eventItem) {
   form.title = eventItem.title || ''
   form.start = eventItem.start || toLocalInputValue(new Date())
   form.allDay = Boolean(eventItem.allDay)
-  form.type = type
+  const allowedTypes = typeOptions.value.map((option) => option.value)
+  form.type = allowedTypes.includes(type) ? type : allowedTypes[0] || 'vacation'
   form.hours = Number.isFinite(hours) ? hours : props.hoursPerDay
 }
 
