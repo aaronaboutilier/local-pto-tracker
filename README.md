@@ -1,5 +1,45 @@
-# Vue 3 + Vite
+# Local PTO Tracker
 
-This template should help get you started developing with Vue 3 in Vite. The template uses Vue 3 `<script setup>` SFCs, check out the [script setup docs](https://v3.vuejs.org/api/sfc-script-setup.html#sfc-script-setup) to learn more.
+A local-first PTO (Paid Time Off) tracker built with Vue 3 and Vite. This application helps you manage and track your vacation, VPP (Voluntary Protection Program), sick days, and personal time off with fiscal year accounting.
 
-Learn more about IDE Support for Vue in the [Vue Docs Scaling up Guide](https://vuejs.org/guide/scaling-up/tooling.html#ide-support).
+## Features
+
+- **Local-First Storage**: All data is stored locally in your browser using `localStorage` - no server required
+- **Fiscal Year Tracking**: Configurable fiscal year boundaries (default starts in April)
+- **Multiple PTO Buckets**: Track four types of time off:
+  - VPP Vacation
+  - Regular Vacation
+  - Sick Days
+  - Personal Days
+- **Flexible Display**: Toggle between hours and days view
+- **Calendar Integration**: Built with FullCalendar for month, week, day, and year views
+- **Event Management**: Create, edit, and delete PTO events with custom metadata
+- **Progress Tracking**: Visual progress bars show usage and remaining balance for each PTO bucket
+- **Customizable Settings**: Configure hours per day and fiscal year start month
+- **Per-Year Balances**: Set different PTO balances for each fiscal year
+
+## Tech Stack
+
+- Vue 3 with `<script setup>` SFCs
+- Vite for fast development and building
+- FullCalendar for calendar rendering
+- localStorage for data persistence
+
+## Development
+
+```bash
+# Install dependencies
+npm install
+
+# Start dev server
+npm run dev
+
+# Build for production
+npm run build
+```
+
+## Learn More
+
+- [Vue 3 Documentation](https://vuejs.org/)
+- [Vite Documentation](https://vitejs.dev/)
+- [FullCalendar Documentation](https://fullcalendar.io/)
