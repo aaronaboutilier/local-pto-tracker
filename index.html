@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/local-pto-tracker/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>PTO Tracker</title>
+    <script>
+      ;(() => {
+        const STORAGE_KEY = 'local_pto_tracker_v1'
+        let mode = 'system'
+
+        try {
+          const stored = localStorage.getItem(STORAGE_KEY)
+          if (stored) {
+            const parsed = JSON.parse(stored)
+            mode = parsed?.settings?.themeMode || 'system'
+          }
+        } catch {
+          mode = 'system'
+        }
+
+        const prefersDark =
+          window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches
+        const resolved = mode === 'system' ? (prefersDark ? 'dark' : 'light') : mode
+        document.documentElement.setAttribute('data-theme', resolved)
+      })()
+    </script>
+    <script type="module" crossorigin src="/local-pto-tracker/assets/index-DDECMUi5.js"></script>
+    <link rel="stylesheet" crossorigin href="/local-pto-tracker/assets/index-B0Tvnl7a.css">
+  </head>
+  <body>
+    <div id="app"></div>
+  </body>
+</html>
