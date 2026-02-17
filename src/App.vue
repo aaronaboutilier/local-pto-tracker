@@ -9,7 +9,8 @@ import YearView from './components/calendar/YearView.vue'
 import PtoTracker from './components/PtoTracker.vue'
 import EventModal from './components/EventModal.vue'
 import { usePtoStore } from './composables/usePtoStore'
-import { toLocalInputValue } from './utils'
+import { toDateOnlyString, toLocalInputValue } from './utils'
+import { DEFAULT_EVENT_COLOR } from './constants/pto'
 import {
   canUseFileSystemSync,
   getFileSystemSyncSupportMessage,
@@ -113,31 +114,8 @@ const calendarOptions = computed(() => ({
   eventClick: onEventClick,
 }))
 
-function toDateOnly(value) {
-  if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
-    return value
-  }
-
-  if (typeof value === 'string') {
-    const dateOnlyMatch = value.match(/^(\d{4}-\d{2}-\d{2})T/)
-    if (dateOnlyMatch?.[1]) {
-      return dateOnlyMatch[1]
-    }
-  }
-
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) {
-    return ''
-  }
-
-  const year = date.getFullYear()
-  const month = String(date.getMonth() + 1).padStart(2, '0')
-  const day = String(date.getDate()).padStart(2, '0')
-  return `${year}-${month}-${day}`
-}
-
 function addDaysToDateOnly(value, days) {
-  const dateOnly = toDateOnly(value)
+  const dateOnly = toDateOnlyString(value)
   if (!dateOnly) {
     return undefined
   }
@@ -145,7 +123,7 @@ function addDaysToDateOnly(value, days) {
   const [year, month, day] = dateOnly.split('-').map(Number)
   const nextDate = new Date(year, month - 1, day)
   nextDate.setDate(nextDate.getDate() + days)
-  return toDateOnly(nextDate)
+  return toDateOnlyString(nextDate)
 }
 
 function toDateTimeByDuration(start, durationHours) {
@@ -283,7 +261,7 @@ function onYearDateSelect(date) {
 }
 
 function openCreateModal(startDate = new Date(), allDay = true) {
-  const normalizedStart = allDay ? toDateOnly(startDate) : toLocalInputValue(startDate)
+  const normalizedStart = allDay ? toDateOnlyString(startDate) : toLocalInputValue(startDate)
 
   modalMode.value = 'create'
   modalInitialEvent.value = {
@@ -309,7 +287,7 @@ function openEditModal(eventItem) {
       : defaultBucketType.value
 
   const normalizedStart = isAllDay
-    ? toDateOnly(eventItem.start || new Date())
+    ? toDateOnlyString(eventItem.start || new Date())
     : toLocalInputValue(eventItem.start || new Date())
   const normalizedEnd = isAllDay && eventItem.end ? addDaysToDateOnly(eventItem.end, -1) : undefined
 
@@ -357,11 +335,11 @@ function onSaveEvent(eventForm) {
       ? rawEventType
       : defaultBucketType.value
   const durationHours = Number(eventForm.extendedProps?.hours || state.settings.hoursPerDay)
-  const normalizedStart = eventForm.allDay ? toDateOnly(eventForm.start) : eventForm.start
+  const normalizedStart = eventForm.allDay ? toDateOnlyString(eventForm.start) : eventForm.start
   let normalizedEnd
 
   if (eventForm.allDay) {
-    const inclusiveEnd = toDateOnly(eventForm.end || eventForm.start)
+    const inclusiveEnd = toDateOnlyString(eventForm.end || eventForm.start)
     normalizedEnd =
       inclusiveEnd && normalizedStart && inclusiveEnd > normalizedStart
         ? addDaysToDateOnly(inclusiveEnd, 1)
@@ -375,7 +353,7 @@ function onSaveEvent(eventForm) {
     id: eventForm.id || String(Date.now()),
     start: normalizedStart,
     end: normalizedEnd,
-    color: ptoColors.value[eventType] || '#1a73e8',
+    color: ptoColors.value[eventType] || DEFAULT_EVENT_COLOR,
     extendedProps: {
       ...eventForm.extendedProps,
       type: eventType,

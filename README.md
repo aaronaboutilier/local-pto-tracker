@@ -34,6 +34,13 @@ npm run dev
 npm run build
 ```
 
+## Code Conventions
+
+- Use shared PTO constants from [src/constants/pto.js](src/constants/pto.js) instead of repeating color literals.
+- Use shared date helpers from [src/utils.js](src/utils.js) for date-only and local input formatting.
+- Keep app behavior local-first: `localStorage` remains default source of truth unless restore is explicitly requested.
+- Prefer small, focused helpers and composables over duplicating transformation logic across components.
+
 ## Backup & Restore
 
 The app remains local-first by default. Your data is always stored in `localStorage` and works without any cloud account.

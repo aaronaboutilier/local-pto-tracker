@@ -1,5 +1,7 @@
 import { computed, reactive, watch } from 'vue'
 import { mockEvents } from '../mockEvents'
+import { DEFAULT_EVENT_COLOR, PTO_COLORS } from '../constants/pto'
+import { toDateOnlyString as toDateOnlyStringValue } from '../utils'
 
 const STORAGE_KEY = 'local_pto_tracker_v1'
 const THEME_MODES = ['system', 'light', 'dark']
@@ -9,13 +11,6 @@ const DEFAULT_BALANCES = {
   vpp: 37.5,
   sick: 75,
   personal: 15,
-}
-const PTO_COLORS = {
-  vacation: '#2980B9',
-  vpp: '#8E44AD',
-  sick: '#C0392B',
-  personal: '#27AE60',
-  holiday: '#F9AB00',
 }
 const DEFAULT_BUCKETS = [
   { key: 'vpp', label: 'VPP Vacation', color: PTO_COLORS.vpp },
@@ -34,23 +29,8 @@ function toLocalDateTimeString(date) {
 }
 
 function toDateOnlyString(value) {
-  if (!value) {
-    return undefined
-  }
-
-  if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
-    return value
-  }
-
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) {
-    return undefined
-  }
-
-  const year = date.getFullYear()
-  const month = String(date.getMonth() + 1).padStart(2, '0')
-  const day = String(date.getDate()).padStart(2, '0')
-  return `${year}-${month}-${day}`
+  const normalized = toDateOnlyStringValue(value)
+  return normalized || undefined
 }
 
 function normalizeEvent(eventItem, index) {
@@ -82,7 +62,7 @@ function normalizeEvent(eventItem, index) {
     id: eventItem.id || String(index + 1),
     start: normalizedStart,
     end: normalizedEnd,
-    color: eventItem.color || PTO_COLORS[eventType] || '#1a73e8',
+    color: eventItem.color || PTO_COLORS[eventType] || DEFAULT_EVENT_COLOR,
     extendedProps: {
       ...eventItem.extendedProps,
       type: eventType,
@@ -124,7 +104,7 @@ function normalizeBucketDefinitions(buckets) {
     accumulator.push({
       key,
       label: bucket.label || key,
-      color: bucket.color || PTO_COLORS[key] || '#1a73e8',
+      color: bucket.color || PTO_COLORS[key] || DEFAULT_EVENT_COLOR,
     })
 
     return accumulator
@@ -170,7 +150,7 @@ function resolveEventColor(eventType) {
   }
 
   const bucket = state.settings.buckets.find((entry) => entry.key === eventType)
-  return bucket?.color || PTO_COLORS[eventType] || '#1a73e8'
+  return bucket?.color || PTO_COLORS[eventType] || DEFAULT_EVENT_COLOR
 }
 
 function getFiscalYear(date = new Date()) {
@@ -480,7 +460,7 @@ function removeBucket(bucketKey) {
 const ptoColors = computed(() => {
   const colors = {}
   state.settings.buckets.forEach((bucket) => {
-    colors[bucket.key] = bucket.color || PTO_COLORS[bucket.key] || '#1a73e8'
+    colors[bucket.key] = bucket.color || PTO_COLORS[bucket.key] || DEFAULT_EVENT_COLOR
   })
   colors.holiday = PTO_COLORS.holiday
   return colors

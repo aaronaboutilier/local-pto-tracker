@@ -1,6 +1,6 @@
 <script setup>
 import { computed, nextTick, reactive, ref, watch } from 'vue'
-import { toLocalInputValue } from '../utils'
+import { parseDateInput, toDateOnlyString, toLocalInputValue } from '../utils'
 
 const props = defineProps({
   open: {
@@ -50,34 +50,8 @@ const form = reactive({
   hours: 7.5,
 })
 
-function parseDateInput(value) {
-  if (!value) {
-    return null
-  }
-
-  if (value instanceof Date) {
-    return Number.isNaN(value.getTime()) ? null : new Date(value)
-  }
-
-  if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
-    const [year, month, day] = value.split('-').map(Number)
-    return new Date(year, month - 1, day)
-  }
-
-  const parsed = new Date(value)
-  return Number.isNaN(parsed.getTime()) ? null : parsed
-}
-
 function toDateInputValue(value) {
-  const date = parseDateInput(value)
-  if (!date) {
-    return ''
-  }
-
-  const year = date.getFullYear()
-  const month = String(date.getMonth() + 1).padStart(2, '0')
-  const day = String(date.getDate()).padStart(2, '0')
-  return `${year}-${month}-${day}`
+  return toDateOnlyString(value)
 }
 
 function toInclusiveEndDate(endValue, startValue) {

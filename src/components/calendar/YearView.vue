@@ -1,6 +1,7 @@
 <script setup>
 import { computed } from 'vue'
 import { startOfDay } from '../../utils'
+import { DEFAULT_EVENT_COLOR, PTO_COLORS } from '../../constants/pto'
 
 const props = defineProps({
   currentDate: {
@@ -16,13 +17,7 @@ const props = defineProps({
 const emit = defineEmits(['select-date'])
 
 const weekdayLabels = ['S', 'M', 'T', 'W', 'T', 'F', 'S']
-const indicatorColorByType = {
-  holiday: '#F9AB00',
-  vacation: '#2980B9',
-  vpp: '#8E44AD',
-  sick: '#C0392B',
-  personal: '#27AE60',
-}
+const indicatorColorByType = PTO_COLORS
 
 function parseEventDate(value, isAllDay = false) {
   if (!value) {
@@ -54,7 +49,7 @@ const eventMetaByDate = computed(() => {
 
     const eventType = eventItem.extendedProps?.type || 'vacation'
     const eventColor =
-      indicatorColorByType[eventType] || eventItem.color || eventItem.backgroundColor || '#1a73e8'
+      indicatorColorByType[eventType] || eventItem.color || eventItem.backgroundColor || DEFAULT_EVENT_COLOR
     const eventTitle = eventItem.title || 'Untitled event'
 
     const parsedStart = parseEventDate(eventItem.start, eventItem.allDay)
@@ -142,7 +137,7 @@ function buildMonth(monthIndex) {
       label: dayNumber,
       date,
       eventCount: eventMetaByDate.value.get(key)?.count || 0,
-      eventColor: eventMetaByDate.value.get(key)?.color || '#1a73e8',
+      eventColor: eventMetaByDate.value.get(key)?.color || DEFAULT_EVENT_COLOR,
       eventTitles: eventMetaByDate.value.get(key)?.titles || [],
       indicatorColors: (eventMetaByDate.value.get(key)?.types || []).map((entry) => entry.color),
     })

@@ -1,3 +1,5 @@
+import { PTO_COLORS } from './constants/pto'
+
 export const mockEvents = [
   {
     id: '1',
@@ -8,7 +10,7 @@ export const mockEvents = [
       type: 'holiday',
       hours: 7.5,
     },
-    color: '#F9AB00',
+    color: PTO_COLORS.holiday,
   },
   {
     id: '2',
@@ -20,7 +22,7 @@ export const mockEvents = [
       type: 'vacation',
       hours: 22.5,
     },
-    color: '#2980B9',
+    color: PTO_COLORS.vacation,
   },
   {
     id: '3',
@@ -31,7 +33,7 @@ export const mockEvents = [
       type: 'sick',
       hours: 0.5,
     },
-    color: '#C0392B',
+    color: PTO_COLORS.sick,
   },
   {
     id: '4',
@@ -42,7 +44,7 @@ export const mockEvents = [
       type: 'personal',
       hours: 0.5,
     },
-    color: '#27AE60',
+    color: PTO_COLORS.personal,
   },
   {
     id: '5',
@@ -54,7 +56,7 @@ export const mockEvents = [
       type: 'vpp',
       hours: 15,
     },
-    color: '#8E44AD',
+    color: PTO_COLORS.vpp,
   },
   {
     id: '6',
@@ -65,7 +67,7 @@ export const mockEvents = [
       type: 'vacation',
       hours: 1,
     },
-    color: '#2980B9',
+    color: PTO_COLORS.vacation,
   },
   {
     id: '7',
@@ -77,7 +79,7 @@ export const mockEvents = [
       type: 'vacation',
       hours: 30,
     },
-    color: '#2980B9',
+    color: PTO_COLORS.vacation,
   },
   {
     id: '8',
@@ -88,6 +90,6 @@ export const mockEvents = [
       type: 'sick',
       hours: 2,
     },
-    color: '#C0392B',
+    color: PTO_COLORS.sick,
   },
 ]

@@ -1,6 +1,7 @@
 <script setup>
 import { computed, ref } from 'vue'
 import { startOfDay } from '../utils'
+import { DEFAULT_EVENT_COLOR, HOLIDAY_BUCKET } from '../constants/pto'
 
 const props = defineProps({
   currentFy: {
@@ -88,7 +89,7 @@ const allocationBuckets = computed(() => props.settings.buckets || [])
 const trackerBuckets = computed(() => {
   const baseBuckets = [...allocationBuckets.value]
   if (props.settings.showHolidayInTracker) {
-    baseBuckets.push({ key: 'holiday', label: 'Holiday', color: '#F9AB00' })
+    baseBuckets.push(HOLIDAY_BUCKET)
   }
   return baseBuckets
 })
@@ -249,7 +250,7 @@ function onShowHolidayToggle(event) {
 }
 
 const newBucketName = ref('')
-const newBucketColor = ref('#1a73e8')
+const newBucketColor = ref(DEFAULT_EVENT_COLOR)
 
 function toBucketKey(label) {
   const normalized = label.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-+|-+$)/g, '') || 'bucket'
@@ -279,7 +280,7 @@ function onAddBucket() {
   emit('add-bucket', {
     key,
     label,
-    color: newBucketColor.value || '#1a73e8',
+    color: newBucketColor.value || DEFAULT_EVENT_COLOR,
   })
 
   newBucketName.value = ''
