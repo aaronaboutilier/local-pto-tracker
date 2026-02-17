@@ -32,7 +32,30 @@ npm run dev
 
 # Build for production
 npm run build
+
+# Deploy to GitHub Project Pages (/local-pto-tracker/)
+npm run deploy
 ```
+
+## Deploy to GitHub Project Pages
+
+This repo is configured for Project Pages at:
+
+- `https://aaronaboutilier.github.io/local-pto-tracker/`
+
+Deployment command:
+
+- `npm run deploy`
+
+What it does:
+
+- Builds with base path `/local-pto-tracker/`
+- Publishes `dist` to the `gh-pages` branch
+
+Repository Pages settings should use:
+
+- Branch: `gh-pages`
+- Folder: `/ (root)`
 
 ## Code Conventions
 
