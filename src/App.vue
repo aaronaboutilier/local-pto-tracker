@@ -9,6 +9,19 @@ import YearView from './components/calendar/YearView.vue'
 import PtoTracker from './components/PtoTracker.vue'
 import EventModal from './components/EventModal.vue'
 import { usePtoStore } from './composables/usePtoStore'
+import {
+  canUseFileSystemSync,
+  getFileSystemSyncSupportMessage,
+  hasFileReadWritePermission,
+  ensureFileReadPermission,
+  ensureFileReadWritePermission,
+  persistSyncFileHandle,
+  loadPersistedSyncFileHandle,
+  openBackupFileForSync,
+  openExistingBackupFileForRestore,
+  writeBackupPayloadToFile,
+  readBackupPayloadFromFile,
+} from './services/fileSystemSync'
 
 const viewToFullCalendar = {
   month: 'dayGridMonth',
@@ -40,10 +53,33 @@ const {
   updateThemeMode,
   addBucket,
   removeBucket,
+  getBackupPayload,
+  importBackupPayload,
   ptoColors,
 } = usePtoStore()
 
 let systemThemeMedia = null
+const FILE_SYNC_PREFS_KEY = 'local_pto_file_sync_v1'
+
+const canSyncToFileSystem = ref(canUseFileSystemSync())
+const fileSyncSupportMessage = ref(getFileSystemSyncSupportMessage())
+const fileSyncEnabled = ref(false)
+const fileSyncTargetName = ref('')
+const fileSyncFileHandle = ref(null)
+const lastFileSyncAt = ref('')
+const syncStatus = ref('')
+const syncError = ref('')
+const FILE_SYNC_DEBOUNCE_MS = 700
+let fileSyncTimer = null
+let lastSyncedStateSnapshot = ''
+
+const lastFileSyncAtLabel = computed(() => {
+  if (!lastFileSyncAt.value) {
+    return 'Never'
+  }
+
+  return new Date(lastFileSyncAt.value).toLocaleString()
+})
 
 const isYearView = computed(() => activeView.value === 'year')
 const defaultBucketType = computed(() => state.settings.buckets[0]?.key || 'vacation')
@@ -349,6 +385,205 @@ function onClearEvents() {
   clearEvents()
 }
 
+function clearSyncMessages() {
+  syncStatus.value = ''
+  syncError.value = ''
+}
+
+async function withFileSyncGuard(work) {
+  clearSyncMessages()
+
+  try {
+    if (!canSyncToFileSystem.value) {
+      throw new Error('File system sync is not supported in this browser.')
+    }
+
+    await work()
+  } catch (error) {
+    syncError.value = error?.message || 'File system sync failed.'
+  }
+}
+
+function clearFileSyncTimer() {
+  if (fileSyncTimer) {
+    window.clearTimeout(fileSyncTimer)
+    fileSyncTimer = null
+  }
+}
+
+function markLastFileSyncNow() {
+  lastFileSyncAt.value = new Date().toISOString()
+  persistFileSyncPrefs()
+}
+
+function getStateSnapshot() {
+  return JSON.stringify(state)
+}
+
+function persistFileSyncPrefs() {
+  const snapshot = {
+    enabled: Boolean(fileSyncEnabled.value),
+    targetName: fileSyncTargetName.value,
+    lastFileSyncAt: lastFileSyncAt.value,
+  }
+
+  localStorage.setItem(FILE_SYNC_PREFS_KEY, JSON.stringify(snapshot))
+}
+
+function readFileSyncPrefs() {
+  const raw = localStorage.getItem(FILE_SYNC_PREFS_KEY)
+  if (!raw) {
+    return null
+  }
+
+  try {
+    return JSON.parse(raw)
+  } catch {
+    return null
+  }
+}
+
+async function restoreFileSyncSession() {
+  const prefs = readFileSyncPrefs()
+  if (!prefs) {
+    return
+  }
+
+  if (prefs.lastFileSyncAt) {
+    lastFileSyncAt.value = prefs.lastFileSyncAt
+  }
+
+  if (!prefs.enabled || !canSyncToFileSystem.value) {
+    return
+  }
+
+  try {
+    const persistedHandle = await loadPersistedSyncFileHandle()
+    if (!persistedHandle) {
+      fileSyncEnabled.value = false
+      syncStatus.value = 'No saved sync file found. Use Enable file sync to choose a file again.'
+      persistFileSyncPrefs()
+      return
+    }
+
+    const hasAccess = await hasFileReadWritePermission(persistedHandle)
+    fileSyncFileHandle.value = persistedHandle
+    fileSyncTargetName.value = persistedHandle.name || prefs.targetName || 'selected backup file'
+    fileSyncEnabled.value = true
+    syncStatus.value = hasAccess
+      ? `Resumed file sync: ${fileSyncTargetName.value}`
+      : `Saved sync file found (${fileSyncTargetName.value}). Permission will be requested on next restore/sync.`
+    persistFileSyncPrefs()
+  } catch {
+    fileSyncEnabled.value = false
+    syncError.value = 'Unable to restore previous file sync session. Please enable sync again.'
+    persistFileSyncPrefs()
+  }
+}
+
+function disableFileSync() {
+  clearFileSyncTimer()
+  fileSyncEnabled.value = false
+  syncStatus.value = 'Disabled file sync for this session.'
+  syncError.value = ''
+  persistFileSyncPrefs()
+}
+
+async function onEnableFileSync() {
+  await withFileSyncGuard(async () => {
+    const fileHandle = await openBackupFileForSync('pto-sync.json')
+    fileSyncFileHandle.value = fileHandle
+    fileSyncTargetName.value = fileHandle.name || 'selected backup file'
+    fileSyncEnabled.value = true
+
+    await persistSyncFileHandle(fileHandle)
+    persistFileSyncPrefs()
+
+    await writeBackupPayloadToFile(fileHandle, getBackupPayload())
+    lastSyncedStateSnapshot = getStateSnapshot()
+    markLastFileSyncNow()
+    syncStatus.value = `File sync enabled: ${fileSyncTargetName.value}`
+  })
+}
+
+async function onSyncToFileNow() {
+  await withFileSyncGuard(async () => {
+    if (!fileSyncEnabled.value || !fileSyncFileHandle.value) {
+      throw new Error('Enable file sync first to choose a backup file.')
+    }
+
+    const hasPermission = await ensureFileReadWritePermission(fileSyncFileHandle.value)
+    if (!hasPermission) {
+      throw new Error('Write permission is required for the sync file.')
+    }
+
+    const payload = getBackupPayload()
+    await writeBackupPayloadToFile(fileSyncFileHandle.value, payload)
+    lastSyncedStateSnapshot = getStateSnapshot()
+    markLastFileSyncNow()
+    syncStatus.value = `Synced data to ${fileSyncTargetName.value}.`
+  })
+}
+
+async function onRestoreFromFileSyncTarget() {
+  await withFileSyncGuard(async () => {
+    const restoreHandle = await openExistingBackupFileForRestore()
+
+    const hasPermission = await ensureFileReadPermission(restoreHandle)
+    if (!hasPermission) {
+      throw new Error('Read permission is required for the sync file.')
+    }
+
+    const shouldRestore = window.confirm(
+      'Restore from synced file and replace your current local data? This cannot be undone.',
+    )
+    if (!shouldRestore) {
+      return
+    }
+
+    const payload = await readBackupPayloadFromFile(restoreHandle)
+    importBackupPayload(payload)
+    fileSyncFileHandle.value = restoreHandle
+    fileSyncTargetName.value = restoreHandle.name || 'selected backup file'
+    fileSyncEnabled.value = true
+    await persistSyncFileHandle(restoreHandle)
+    persistFileSyncPrefs()
+    lastSyncedStateSnapshot = getStateSnapshot()
+    markLastFileSyncNow()
+    syncStatus.value = `Restored data from ${fileSyncTargetName.value}.`
+  })
+}
+
+function queueFileAutoSync() {
+  if (!fileSyncEnabled.value || !fileSyncFileHandle.value) {
+    return
+  }
+
+  const nextSnapshot = getStateSnapshot()
+  if (nextSnapshot === lastSyncedStateSnapshot) {
+    return
+  }
+
+  clearFileSyncTimer()
+  fileSyncTimer = window.setTimeout(async () => {
+    try {
+      const hasPermission = await hasFileReadWritePermission(fileSyncFileHandle.value)
+      if (!hasPermission) {
+        syncStatus.value = 'Sync file permission is not active. Use Sync now or Restore from file to re-authorize.'
+        return
+      }
+
+      await writeBackupPayloadToFile(fileSyncFileHandle.value, getBackupPayload())
+      lastSyncedStateSnapshot = nextSnapshot
+      markLastFileSyncNow()
+      syncStatus.value = `Auto-synced to ${fileSyncTargetName.value}.`
+      syncError.value = ''
+    } catch (error) {
+      syncError.value = error?.message || 'Auto-sync failed.'
+    }
+  }, FILE_SYNC_DEBOUNCE_MS)
+}
+
 function resolveTheme(mode) {
   if (mode === 'light' || mode === 'dark') {
     return mode
@@ -379,7 +614,10 @@ watch(
   },
 )
 
+watch(state, queueFileAutoSync, { deep: true })
+
 onMounted(() => {
+  restoreFileSyncSession()
   applyTheme(state.settings.themeMode)
 
   systemThemeMedia = window.matchMedia('(prefers-color-scheme: dark)')
@@ -391,6 +629,8 @@ onMounted(() => {
 })
 
 onBeforeUnmount(() => {
+  clearFileSyncTimer()
+
   if (!systemThemeMedia) {
     return
   }
@@ -415,12 +655,23 @@ changeView('month')
         :active-balance="activeBalance"
         :usage-stats="usageStats"
         :events="state.events"
+        :can-sync-to-file-system="canSyncToFileSystem"
+        :file-sync-support-message="fileSyncSupportMessage"
+        :file-sync-enabled="fileSyncEnabled"
+        :file-sync-target-name="fileSyncTargetName"
+        :last-file-sync-at-label="lastFileSyncAtLabel"
+        :sync-status="syncStatus"
+        :sync-error="syncError"
         @update-fiscal-year-start="onUpdateFiscalYearStart"
         @update-bucket-size="onUpdateBucketSize"
         @update-hours-per-day="onUpdateHoursPerDay"
         @update-show-holiday-tracker="onUpdateShowHolidayTracker"
         @add-bucket="onAddBucket"
         @remove-bucket="onRemoveBucket"
+        @enable-file-sync="onEnableFileSync"
+        @disable-file-sync="disableFileSync"
+        @sync-to-file-now="onSyncToFileNow"
+        @restore-from-file-sync-target="onRestoreFromFileSyncTarget"
         @clear-events="onClearEvents"
       />
 

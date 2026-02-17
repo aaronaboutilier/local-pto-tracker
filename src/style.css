@@ -88,11 +88,21 @@ body {
   margin-bottom: 12px;
 }
 
+.pto-tracker__heading {
+  min-width: 0;
+}
+
 .pto-tracker__title {
   margin: 0;
   font-size: 1rem;
   font-weight: 600;
   color: var(--text-strong);
+}
+
+.pto-tracker__meta {
+  margin: 2px 0 0;
+  font-size: 0.72rem;
+  color: var(--text-muted);
 }
 
 .pto-gear-btn {
@@ -213,20 +223,37 @@ body {
   inset: 0;
   background: var(--backdrop);
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
+  padding: 16px;
+  overflow-y: auto;
   z-index: 1100;
 }
 
 .settings-modal {
-  width: 360px;
+  width: min(760px, calc(100vw - 32px));
   max-width: calc(100vw - 32px);
+  max-height: calc(100vh - 32px);
   background: var(--bg-surface);
   border: 1px solid var(--border-main);
   border-radius: 12px;
   padding: 14px;
   display: grid;
   gap: 10px;
+  overflow-y: auto;
+}
+
+.settings-modal__body {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.settings-modal__col {
+  min-width: 0;
+  display: grid;
+  gap: 10px;
+  align-content: start;
 }
 
 .settings-modal .pto-settings {
@@ -327,6 +354,44 @@ body {
 .pto-settings-actions {
   display: flex;
   justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.settings-modal__col .pto-settings-actions {
+  justify-content: flex-start;
+}
+
+.pto-import-btn {
+  position: relative;
+  overflow: hidden;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.pto-import-input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.pto-sync-section {
+  border-top: 1px solid var(--border-subtle);
+  padding-top: 10px;
+}
+
+.pto-sync-text {
+  margin: 0;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+.pto-sync-error {
+  margin: 0;
+  font-size: 0.78rem;
+  color: var(--danger-text);
 }
 
 .pto-clear-btn {
@@ -637,4 +702,10 @@ body {
   display: flex;
   justify-content: flex-end;
   gap: 8px;
+}
+
+@media (max-width: 760px) {
+  .settings-modal__body {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }

@@ -149,5 +149,5 @@ Optional behavior to add later: suggest consuming VPP first.
 ## Next Implementation Slice
 1. Optional: add drag/resize support and write-back to `extendedProps.hours`.
 2. Optional: add recurring PTO templates (e.g., monthly personal day).
-3. Optional: add export/import JSON backup for local-first portability.
+3. Add optional local file system sync (Chromium) alongside JSON export/import backup.
 4. Optional: add VPP-first deduction helper recommendations.

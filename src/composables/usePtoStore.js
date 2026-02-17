@@ -171,6 +171,61 @@ function save() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state))
 }
 
+function applyPersistedState(parsed) {
+  if (parsed.settings) {
+    state.settings = {
+      ...state.settings,
+      ...parsed.settings,
+      buckets: normalizeBucketDefinitions(parsed.settings.buckets || state.settings.buckets),
+      bucketSizes: {
+        ...state.settings.bucketSizes,
+        ...(parsed.settings.bucketSizes || {}),
+      },
+    }
+  }
+
+  if (parsed.yearlyBalances && typeof parsed.yearlyBalances === 'object') {
+    state.yearlyBalances = parsed.yearlyBalances
+  }
+
+  if (Array.isArray(parsed.events)) {
+    state.events = parsed.events.map(normalizeEvent)
+  }
+
+  state.settings.bucketSizes = buildBucketSizesMap(state.settings.bucketSizes)
+  Object.keys(state.yearlyBalances).forEach((yearKey) => {
+    state.yearlyBalances[yearKey] = buildBucketSizesMap(state.yearlyBalances[yearKey])
+  })
+
+  ensureBalanceForYear(getFiscalYear())
+}
+
+function getBackupPayload() {
+  return {
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    data: JSON.parse(JSON.stringify(state)),
+  }
+}
+
+function importBackupPayload(payload) {
+  const candidate = payload?.data && typeof payload.data === 'object' ? payload.data : payload
+  if (!candidate || typeof candidate !== 'object') {
+    throw new Error('Backup payload is invalid.')
+  }
+
+  const hasValidEvents = candidate.events === undefined || Array.isArray(candidate.events)
+  const hasValidSettings = candidate.settings === undefined || typeof candidate.settings === 'object'
+  const hasValidBalances =
+    candidate.yearlyBalances === undefined || typeof candidate.yearlyBalances === 'object'
+
+  if (!hasValidEvents || !hasValidSettings || !hasValidBalances) {
+    throw new Error('Backup payload does not match PTO tracker format.')
+  }
+
+  applyPersistedState(candidate)
+}
+
 function load() {
   if (hasInitialized) {
     return
@@ -181,37 +236,12 @@ function load() {
   if (stored) {
     try {
       const parsed = JSON.parse(stored)
-
-      if (parsed.settings) {
-        state.settings = {
-          ...state.settings,
-          ...parsed.settings,
-          buckets: normalizeBucketDefinitions(parsed.settings.buckets || state.settings.buckets),
-          bucketSizes: {
-            ...state.settings.bucketSizes,
-            ...(parsed.settings.bucketSizes || {}),
-          },
-        }
-      }
-
-      if (parsed.yearlyBalances && typeof parsed.yearlyBalances === 'object') {
-        state.yearlyBalances = parsed.yearlyBalances
-      }
-
-      if (Array.isArray(parsed.events)) {
-        state.events = parsed.events.map(normalizeEvent)
-      }
+      applyPersistedState(parsed)
     } catch {
       state.events = mockEvents.map(normalizeEvent)
     }
   }
 
-  state.settings.bucketSizes = buildBucketSizesMap(state.settings.bucketSizes)
-  Object.keys(state.yearlyBalances).forEach((yearKey) => {
-    state.yearlyBalances[yearKey] = buildBucketSizesMap(state.yearlyBalances[yearKey])
-  })
-
-  ensureBalanceForYear(getFiscalYear())
   hasInitialized = true
 }
 
@@ -455,6 +485,8 @@ export function usePtoStore() {
     updateThemeMode,
     addBucket,
     removeBucket,
+    getBackupPayload,
+    importBackupPayload,
     save,
     load,
     defaultBalances: DEFAULT_BALANCES,

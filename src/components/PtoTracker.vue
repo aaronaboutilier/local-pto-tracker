@@ -22,6 +22,34 @@ const props = defineProps({
     type: Array,
     required: true,
   },
+  canSyncToFileSystem: {
+    type: Boolean,
+    default: false,
+  },
+  fileSyncSupportMessage: {
+    type: String,
+    default: '',
+  },
+  syncStatus: {
+    type: String,
+    default: '',
+  },
+  syncError: {
+    type: String,
+    default: '',
+  },
+  fileSyncEnabled: {
+    type: Boolean,
+    default: false,
+  },
+  fileSyncTargetName: {
+    type: String,
+    default: '',
+  },
+  lastFileSyncAtLabel: {
+    type: String,
+    default: 'Never',
+  },
 })
 const emit = defineEmits([
   'update-fiscal-year-start',
@@ -31,6 +59,10 @@ const emit = defineEmits([
   'add-bucket',
   'remove-bucket',
   'clear-events',
+  'enable-file-sync',
+  'disable-file-sync',
+  'sync-to-file-now',
+  'restore-from-file-sync-target',
 ])
 
 const viewMode = ref('days')
@@ -272,12 +304,16 @@ function toggleSettings() {
 function closeSettings() {
   settingsOpen.value = false
 }
+
 </script>
 
 <template>
   <aside class="pto-tracker">
     <div class="pto-tracker__header">
-      <h2 class="pto-tracker__title">FY{{ currentFy }} Tracker</h2>
+      <div class="pto-tracker__heading">
+        <h2 class="pto-tracker__title">FY{{ currentFy }} Tracker</h2>
+        <p class="pto-tracker__meta">Last synced: {{ lastFileSyncAtLabel }}</p>
+      </div>
       <button class="pto-gear-btn" aria-label="Open settings" @click="toggleSettings">⚙</button>
     </div>
 
@@ -326,115 +362,164 @@ function closeSettings() {
           <h3 class="settings-modal__title">Settings</h3>
           <button class="pto-gear-btn" aria-label="Close settings" @click="closeSettings">✕</button>
         </header>
-
-        <div class="pto-setting">
-          <p class="pto-setting-group__title">Display mode</p>
-          <div class="pto-toggle">
-            <button
-              class="pto-toggle__btn"
-              :class="{ 'is-active': viewMode === 'days' }"
-              @click="viewMode = 'days'"
-            >
-              Days
-            </button>
-            <button
-              class="pto-toggle__btn"
-              :class="{ 'is-active': viewMode === 'hours' }"
-              @click="viewMode = 'hours'"
-            >
-              Hours
-            </button>
-          </div>
-        </div>
-
-        <div class="pto-setting">
-          <label class="pto-setting__label" for="hours-per-day">Work hours per day</label>
-          <input
-            id="hours-per-day"
-            class="pto-setting__control"
-            type="number"
-            min="0.25"
-            step="0.25"
-            :value="settings.hoursPerDay"
-            @change="onHoursPerDayChange"
-          />
-        </div>
-
-        <div class="pto-setting">
-          <label class="pto-setting__label" for="fy-start-month">Fiscal year starts</label>
-          <select
-            id="fy-start-month"
-            class="pto-setting__control"
-            :value="settings.fiscalYearStartMonth"
-            @change="onFiscalYearStartChange"
-          >
-            <option v-for="(month, index) in monthOptions" :key="month" :value="index">
-              {{ month }}
-            </option>
-          </select>
-        </div>
-
-        <label class="pto-setting pto-setting--checkbox" for="show-holiday-tracker">
-          <span class="pto-setting__label">Show Holiday in tracker</span>
-          <input
-            id="show-holiday-tracker"
-            type="checkbox"
-            :checked="settings.showHolidayInTracker"
-            @change="onShowHolidayToggle"
-          />
-        </label>
-
-        <div class="pto-settings">
-          <p class="pto-setting-group__title">
-            Bucket allocations ({{ viewMode === 'hours' ? 'hours' : 'days' }})
-          </p>
-          <div
-            v-for="bucket in allocationBuckets"
-            :key="`allocation-${bucket.key}`"
-            class="pto-setting pto-setting--bucket"
-          >
-            <div class="pto-bucket-row__top">
-              <label class="pto-setting__label" :for="`allocation-${bucket.key}`">{{ bucket.label }}</label>
-              <button
-                class="bucket-remove-btn"
-                :disabled="allocationBuckets.length <= 1"
-                @click="onRemoveBucket(bucket.key)"
-              >
-                Remove
-              </button>
+        <div class="settings-modal__body">
+          <div class="settings-modal__col settings-modal__col--left">
+            <div class="pto-setting">
+              <p class="pto-setting-group__title">Display mode</p>
+              <div class="pto-toggle">
+                <button
+                  class="pto-toggle__btn"
+                  :class="{ 'is-active': viewMode === 'days' }"
+                  @click="viewMode = 'days'"
+                >
+                  Days
+                </button>
+                <button
+                  class="pto-toggle__btn"
+                  :class="{ 'is-active': viewMode === 'hours' }"
+                  @click="viewMode = 'hours'"
+                >
+                  Hours
+                </button>
+              </div>
             </div>
-            <div class="pto-bucket-inputs">
+
+            <div class="pto-setting">
+              <label class="pto-setting__label" for="hours-per-day">Work hours per day</label>
               <input
-                :id="`allocation-${bucket.key}`"
+                id="hours-per-day"
                 class="pto-setting__control"
                 type="number"
-                min="0"
-                :step="viewMode === 'hours' ? 0.5 : 0.25"
-                :value="getBucketInputValue(bucket.key)"
-                @change="onBucketSizeChange(bucket.key, $event)"
+                min="0.25"
+                step="0.25"
+                :value="settings.hoursPerDay"
+                @change="onHoursPerDayChange"
               />
-              <span class="pto-bucket-color" :style="{ backgroundColor: bucket.color }" aria-hidden="true"></span>
             </div>
-          </div>
 
-          <div class="pto-setting pto-setting--bucket">
-            <label class="pto-setting__label" for="new-bucket-name">Add bucket</label>
-            <div class="pto-bucket-add">
-              <input
-                id="new-bucket-name"
-                v-model="newBucketName"
+            <div class="pto-setting">
+              <label class="pto-setting__label" for="fy-start-month">Fiscal year starts</label>
+              <select
+                id="fy-start-month"
                 class="pto-setting__control"
-                type="text"
-                placeholder="Name"
+                :value="settings.fiscalYearStartMonth"
+                @change="onFiscalYearStartChange"
+              >
+                <option v-for="(month, index) in monthOptions" :key="month" :value="index">
+                  {{ month }}
+                </option>
+              </select>
+            </div>
+
+            <label class="pto-setting pto-setting--checkbox" for="show-holiday-tracker">
+              <span class="pto-setting__label">Show Holiday in tracker</span>
+              <input
+                id="show-holiday-tracker"
+                type="checkbox"
+                :checked="settings.showHolidayInTracker"
+                @change="onShowHolidayToggle"
               />
-              <input v-model="newBucketColor" class="pto-setting__control pto-color-input" type="color" />
-              <button class="bucket-add-btn" @click="onAddBucket">Add</button>
+            </label>
+
+            <div class="pto-settings">
+              <p class="pto-setting-group__title">
+                Bucket allocations ({{ viewMode === 'hours' ? 'hours' : 'days' }})
+              </p>
+              <div
+                v-for="bucket in allocationBuckets"
+                :key="`allocation-${bucket.key}`"
+                class="pto-setting pto-setting--bucket"
+              >
+                <div class="pto-bucket-row__top">
+                  <label class="pto-setting__label" :for="`allocation-${bucket.key}`">{{ bucket.label }}</label>
+                  <button
+                    class="bucket-remove-btn"
+                    :disabled="allocationBuckets.length <= 1"
+                    @click="onRemoveBucket(bucket.key)"
+                  >
+                    Remove
+                  </button>
+                </div>
+                <div class="pto-bucket-inputs">
+                  <input
+                    :id="`allocation-${bucket.key}`"
+                    class="pto-setting__control"
+                    type="number"
+                    min="0"
+                    :step="viewMode === 'hours' ? 0.5 : 0.25"
+                    :value="getBucketInputValue(bucket.key)"
+                    @change="onBucketSizeChange(bucket.key, $event)"
+                  />
+                  <span class="pto-bucket-color" :style="{ backgroundColor: bucket.color }" aria-hidden="true"></span>
+                </div>
+              </div>
+
+              <div class="pto-setting pto-setting--bucket">
+                <label class="pto-setting__label" for="new-bucket-name">Add bucket</label>
+                <div class="pto-bucket-add">
+                  <input
+                    id="new-bucket-name"
+                    v-model="newBucketName"
+                    class="pto-setting__control"
+                    type="text"
+                    placeholder="Name"
+                  />
+                  <input v-model="newBucketColor" class="pto-setting__control pto-color-input" type="color" />
+                  <button class="bucket-add-btn" @click="onAddBucket">Add</button>
+                </div>
+              </div>
             </div>
           </div>
-        </div>
 
-        <div class="pto-settings-actions">
-          <button class="toolbar-btn pto-clear-btn" @click="emit('clear-events')">Clear events</button>
+          <div class="settings-modal__col settings-modal__col--right">
+            <div class="pto-setting pto-sync-section">
+              <p class="pto-setting-group__title">File Sync (optional)</p>
+              <p v-if="!canSyncToFileSystem" class="pto-sync-text">
+                {{ fileSyncSupportMessage || 'File sync is unavailable in this browser.' }}
+              </p>
+              <p v-else-if="fileSyncEnabled" class="pto-sync-text">
+                Sync target: {{ fileSyncTargetName || 'Selected file' }}
+              </p>
+              <p class="pto-sync-text">Last synced: {{ lastFileSyncAtLabel }}</p>
+              <p v-if="syncStatus" class="pto-sync-text">{{ syncStatus }}</p>
+              <p v-if="syncError" class="pto-sync-error">{{ syncError }}</p>
+
+              <div class="pto-settings-actions">
+                <button
+                  class="toolbar-btn"
+                  :disabled="!canSyncToFileSystem"
+                  @click="emit('enable-file-sync')"
+                >
+                  {{ fileSyncEnabled ? 'Change sync file' : 'Enable file sync' }}
+                </button>
+                <button
+                  class="toolbar-btn"
+                  :disabled="!fileSyncEnabled"
+                  @click="emit('disable-file-sync')"
+                >
+                  Disable sync
+                </button>
+                <button
+                  class="toolbar-btn"
+                  :disabled="!fileSyncEnabled"
+                  @click="emit('sync-to-file-now')"
+                >
+                  Sync now
+                </button>
+                <button
+                  class="toolbar-btn"
+                  :disabled="!canSyncToFileSystem"
+                  @click="emit('restore-from-file-sync-target')"
+                >
+                  Restore from file
+                </button>
+              </div>
+            </div>
+
+            <div class="pto-settings-actions">
+              <button class="toolbar-btn pto-clear-btn" @click="emit('clear-events')">Clear events</button>
+            </div>
+          </div>
         </div>
       </section>
     </div>
