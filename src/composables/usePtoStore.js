@@ -33,6 +33,26 @@ function toLocalDateTimeString(date) {
   return `${year}-${month}-${day}T${hour}:${minute}`
 }
 
+function toDateOnlyString(value) {
+  if (!value) {
+    return undefined
+  }
+
+  if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return value
+  }
+
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) {
+    return undefined
+  }
+
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
 function normalizeEvent(eventItem, index) {
   const eventType = eventItem.extendedProps?.type || 'vacation'
   const eventHours =
@@ -42,8 +62,11 @@ function normalizeEvent(eventItem, index) {
         ? 7.5
         : 1
   const isAllDayEvent = Boolean(eventItem.allDay)
+  const normalizedStart = isAllDayEvent
+    ? toDateOnlyString(eventItem.start) || eventItem.start
+    : eventItem.start
 
-  let normalizedEnd = eventItem.end
+  let normalizedEnd = isAllDayEvent ? toDateOnlyString(eventItem.end) : eventItem.end
 
   if (!isAllDayEvent && eventItem.start) {
     const startDate = new Date(eventItem.start)
@@ -57,6 +80,7 @@ function normalizeEvent(eventItem, index) {
   return {
     ...eventItem,
     id: eventItem.id || String(index + 1),
+    start: normalizedStart,
     end: normalizedEnd,
     color: eventItem.color || PTO_COLORS[eventType] || '#1a73e8',
     extendedProps: {

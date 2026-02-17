@@ -8,7 +8,7 @@ A local-first PTO (Paid Time Off) tracker built with Vue 3 and Vite. This applic
 - **Fiscal Year Tracking**: Configurable fiscal year boundaries (default starts in April)
 - **Configurable PTO Buckets**: Defaults to VPP Vacation, Regular Vacation, Sick Days, and Personal Days, and you can add or remove buckets with custom names, colors, and allocations
 - **Calendar Integration**: Built with FullCalendar for month, week, day, and year views
-- **Event Management**: Create, edit, and delete PTO events with custom metadata
+- **Event Management**: Create, edit, and delete PTO events with custom metadata, including all-day multi-day ranges
 - **Progress Tracking**: Visual progress bars show usage and remaining balance for each PTO bucket
 - **Customizable Settings**: Configure hours per day and fiscal year start month
 - **Per-Year Balances**: Set different PTO balances for each fiscal year

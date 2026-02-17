@@ -33,8 +33,16 @@ function onViewClick(viewKey) {
     <div class="calendar-toolbar__left">
       <button class="toolbar-btn toolbar-btn--today" @click="emit('today')">Today</button>
       <div class="nav-btn-group">
-        <button class="toolbar-btn" aria-label="Previous" @click="emit('previous')">‹</button>
-        <button class="toolbar-btn" aria-label="Next" @click="emit('next')">›</button>
+        <button class="toolbar-btn" aria-label="Previous" @click="emit('previous')">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+            <path d="M10 3L5 8L10 13" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </button>
+        <button class="toolbar-btn" aria-label="Next" @click="emit('next')">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+            <path d="M6 3L11 8L6 13" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </button>
       </div>
       <h1 class="calendar-title">{{ props.title }}</h1>
     </div>

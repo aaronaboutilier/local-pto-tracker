@@ -1,5 +1,6 @@
 <script setup>
 import { computed } from 'vue'
+import { startOfDay } from '../../utils'
 
 const props = defineProps({
   currentDate: {
@@ -21,10 +22,6 @@ const indicatorColorByType = {
   vpp: '#8E44AD',
   sick: '#C0392B',
   personal: '#27AE60',
-}
-
-function startOfDay(date) {
-  return new Date(date.getFullYear(), date.getMonth(), date.getDate())
 }
 
 function parseEventDate(value, isAllDay = false) {

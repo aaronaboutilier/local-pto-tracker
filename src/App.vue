@@ -9,6 +9,7 @@ import YearView from './components/calendar/YearView.vue'
 import PtoTracker from './components/PtoTracker.vue'
 import EventModal from './components/EventModal.vue'
 import { usePtoStore } from './composables/usePtoStore'
+import { toLocalInputValue } from './utils'
 import {
   canUseFileSystemSync,
   getFileSystemSyncSupportMessage,
@@ -112,22 +113,39 @@ const calendarOptions = computed(() => ({
   eventClick: onEventClick,
 }))
 
-function toLocalInputValue(date) {
-  const value = new Date(date)
-  const year = value.getFullYear()
-  const month = String(value.getMonth() + 1).padStart(2, '0')
-  const day = String(value.getDate()).padStart(2, '0')
-  const hour = String(value.getHours()).padStart(2, '0')
-  const minute = String(value.getMinutes()).padStart(2, '0')
-  return `${year}-${month}-${day}T${hour}:${minute}`
-}
-
 function toDateOnly(value) {
+  if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return value
+  }
+
+  if (typeof value === 'string') {
+    const dateOnlyMatch = value.match(/^(\d{4}-\d{2}-\d{2})T/)
+    if (dateOnlyMatch?.[1]) {
+      return dateOnlyMatch[1]
+    }
+  }
+
   const date = new Date(value)
+  if (Number.isNaN(date.getTime())) {
+    return ''
+  }
+
   const year = date.getFullYear()
   const month = String(date.getMonth() + 1).padStart(2, '0')
   const day = String(date.getDate()).padStart(2, '0')
   return `${year}-${month}-${day}`
+}
+
+function addDaysToDateOnly(value, days) {
+  const dateOnly = toDateOnly(value)
+  if (!dateOnly) {
+    return undefined
+  }
+
+  const [year, month, day] = dateOnly.split('-').map(Number)
+  const nextDate = new Date(year, month - 1, day)
+  nextDate.setDate(nextDate.getDate() + days)
+  return toDateOnly(nextDate)
 }
 
 function toDateTimeByDuration(start, durationHours) {
@@ -265,10 +283,13 @@ function onYearDateSelect(date) {
 }
 
 function openCreateModal(startDate = new Date(), allDay = true) {
+  const normalizedStart = allDay ? toDateOnly(startDate) : toLocalInputValue(startDate)
+
   modalMode.value = 'create'
   modalInitialEvent.value = {
     title: '',
-    start: toLocalInputValue(startDate),
+    start: normalizedStart,
+    end: allDay ? normalizedStart : undefined,
     allDay,
     extendedProps: {
       type: defaultBucketType.value,
@@ -280,16 +301,24 @@ function openCreateModal(startDate = new Date(), allDay = true) {
 
 function openEditModal(eventItem) {
   modalMode.value = 'edit'
+  const isAllDay = Boolean(eventItem.allDay)
   const type = eventItem.extendedProps?.type
   const validType =
     type === 'holiday' || state.settings.buckets.some((bucket) => bucket.key === type)
       ? type
       : defaultBucketType.value
+
+  const normalizedStart = isAllDay
+    ? toDateOnly(eventItem.start || new Date())
+    : toLocalInputValue(eventItem.start || new Date())
+  const normalizedEnd = isAllDay && eventItem.end ? addDaysToDateOnly(eventItem.end, -1) : undefined
+
   modalInitialEvent.value = {
     id: eventItem.id,
     title: eventItem.title,
-    start: toLocalInputValue(eventItem.start || new Date()),
-    allDay: eventItem.allDay,
+    start: normalizedStart,
+    end: normalizedEnd,
+    allDay: isAllDay,
     extendedProps: {
       type: validType,
       hours: Number(eventItem.extendedProps?.hours || state.settings.hoursPerDay),
@@ -299,7 +328,8 @@ function openEditModal(eventItem) {
 }
 
 function onDateClick(info) {
-  openCreateModal(info.date, info.allDay)
+  const clickedStart = info.allDay ? info.dateStr : info.date
+  openCreateModal(clickedStart, info.allDay)
 }
 
 function onEventClick(info) {
@@ -307,6 +337,7 @@ function onEventClick(info) {
     id: info.event.id,
     title: info.event.title,
     start: info.event.start,
+    end: info.event.end,
     allDay: info.event.allDay,
     extendedProps: {
       ...info.event.extendedProps,
@@ -327,9 +358,17 @@ function onSaveEvent(eventForm) {
       : defaultBucketType.value
   const durationHours = Number(eventForm.extendedProps?.hours || state.settings.hoursPerDay)
   const normalizedStart = eventForm.allDay ? toDateOnly(eventForm.start) : eventForm.start
-  const normalizedEnd = eventForm.allDay
-    ? undefined
-    : toDateTimeByDuration(eventForm.start, durationHours)
+  let normalizedEnd
+
+  if (eventForm.allDay) {
+    const inclusiveEnd = toDateOnly(eventForm.end || eventForm.start)
+    normalizedEnd =
+      inclusiveEnd && normalizedStart && inclusiveEnd > normalizedStart
+        ? addDaysToDateOnly(inclusiveEnd, 1)
+        : undefined
+  } else {
+    normalizedEnd = toDateTimeByDuration(eventForm.start, durationHours)
+  }
 
   upsertEvent({
     ...eventForm,
@@ -348,6 +387,11 @@ function onSaveEvent(eventForm) {
 }
 
 function onDeleteEvent(eventId) {
+  const confirmed = window.confirm('Delete this event? This cannot be undone.')
+  if (!confirmed) {
+    return
+  }
+
   deleteEvent(eventId)
   closeModal()
 }
@@ -688,6 +732,10 @@ changeView('month')
         />
 
         <section ref="calendarContentRef" class="calendar-content">
+          <div v-if="state.events.length === 0" class="calendar-empty-hint">
+            Click any date to add your first time-off event
+          </div>
+
           <YearView
             v-if="isYearView"
             :current-date="activeDate"

@@ -1,5 +1,6 @@
 <script setup>
 import { computed, ref } from 'vue'
+import { startOfDay } from '../utils'
 
 const props = defineProps({
   currentFy: {
@@ -125,11 +126,6 @@ function getPercentage(used, total) {
   }
 
   return Math.min((used / total) * 100, 100)
-}
-
-function startOfDay(dateValue) {
-  const date = new Date(dateValue)
-  return new Date(date.getFullYear(), date.getMonth(), date.getDate())
 }
 
 function getFiscalYearForDate(dateValue) {
@@ -314,7 +310,12 @@ function closeSettings() {
         <h2 class="pto-tracker__title">FY{{ currentFy }} Tracker</h2>
         <p class="pto-tracker__meta">Last synced: {{ lastFileSyncAtLabel }}</p>
       </div>
-      <button class="pto-gear-btn" aria-label="Open settings" @click="toggleSettings">⚙</button>
+      <button class="pto-gear-btn" aria-label="Open settings" @click="toggleSettings">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <path d="M12 15a3 3 0 100-6 3 3 0 000 6z" stroke="currentColor" stroke-width="1.8"/>
+          <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 11-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 110-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 114 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 110 4h-.09a1.65 1.65 0 00-1.51 1z" stroke="currentColor" stroke-width="1.8"/>
+        </svg>
+      </button>
     </div>
 
     <div class="pto-buckets">
@@ -356,11 +357,16 @@ function closeSettings() {
       </div>
     </div>
 
-    <div v-if="settingsOpen" class="settings-backdrop" @click.self="closeSettings">
+    <Transition name="modal">
+    <div v-if="settingsOpen" class="settings-backdrop" @click.self="closeSettings" @keydown.escape.window="closeSettings">
       <section class="settings-modal" role="dialog" aria-modal="true" aria-label="PTO settings">
         <header class="settings-modal__header">
           <h3 class="settings-modal__title">Settings</h3>
-          <button class="pto-gear-btn" aria-label="Close settings" @click="closeSettings">✕</button>
+          <button class="pto-gear-btn" aria-label="Close settings" @click="closeSettings">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+              <path d="M4 4L12 12M12 4L4 12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+            </svg>
+          </button>
         </header>
         <div class="settings-modal__body">
           <div class="settings-modal__col settings-modal__col--left">
@@ -523,5 +529,6 @@ function closeSettings() {
         </div>
       </section>
     </div>
+    </Transition>
   </aside>
 </template>
